@@ -1,0 +1,30 @@
+{
+  "results": [
+    {
+      "run": "small_ffn0_local",
+      "ffn_layers": 0,
+      "description": "0 FFN layers (no FFN)",
+      "final_val_loss": 1.7090573072433473
+    },
+    {
+      "run": "small_ffn1_local",
+      "ffn_layers": 1,
+      "description": "1 FFN layer",
+      "final_val_loss": 1.5959801495075225
+    },
+    {
+      "run": "small_ffn2_local",
+      "ffn_layers": 2,
+      "description": "2 FFN layers (baseline)",
+      "final_val_loss": 1.337932723760605
+    },
+    {
+      "run": "small_ffn3_local",
+      "ffn_layers": 3,
+      "description": "3 FFN layers",
+      "final_val_loss": 1.4012164235115052
+    }
+  ],
+  "max_steps": 2000,
+  "vocab": "byte-level"
+}
