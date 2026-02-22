@@ -31,6 +31,7 @@ class TransformerBlock(nn.Module):
         ffn_layers: Number of linear layers in the FFN sub-layer (0, 1, 2, or 3).
         d_ff: Inner FFN dimension (defaults to 4 * d_model).
         dropout: Dropout probability applied in both MHA and FFN.
+        act_type: Activation function used inside the FFN (default 'gelu').
     """
 
     def __init__(
@@ -40,6 +41,7 @@ class TransformerBlock(nn.Module):
         ffn_layers: int,
         d_ff: int | None = None,
         dropout: float = 0.1,
+        act_type: str = "gelu",
     ) -> None:
         super().__init__()
 
@@ -49,7 +51,7 @@ class TransformerBlock(nn.Module):
 
         # Sub-layers
         self.attn = MultiHeadAttention(d_model, n_heads, dropout)
-        self.ffn = build_ffn(ffn_layers, d_model, d_ff, dropout)
+        self.ffn = build_ffn(ffn_layers, d_model, d_ff, dropout, act_type)
         self.res_dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

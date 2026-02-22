@@ -48,12 +48,14 @@ class DecoderTransformer(nn.Module):
         max_seq_len: int = 1024,
         d_ff: int | None = None,
         dropout: float = 0.1,
+        act_type: str = "gelu",
     ) -> None:
         super().__init__()
 
         self.d_model = d_model
         self.n_layers = n_layers
         self.ffn_layers = ffn_layers
+        self.act_type = act_type
 
         # Embeddings
         self.token_emb = nn.Embedding(vocab_size, d_model)
@@ -63,7 +65,7 @@ class DecoderTransformer(nn.Module):
         # Transformer blocks
         self.blocks = nn.ModuleList(
             [
-                TransformerBlock(d_model, n_heads, ffn_layers, d_ff, dropout)
+                TransformerBlock(d_model, n_heads, ffn_layers, d_ff, dropout, act_type)
                 for _ in range(n_layers)
             ]
         )
@@ -168,10 +170,11 @@ class DecoderTransformer(nn.Module):
         """Return a human-readable model description."""
         counts = self.count_parameters()
         lines = [
-            f"DecoderTransformer (ffn_layers={self.ffn_layers})",
+            f"DecoderTransformer (ffn_layers={self.ffn_layers}, act={self.act_type})",
             f"  n_layers   : {self.n_layers}",
             f"  d_model    : {self.d_model}",
             f"  ffn_layers : {self.ffn_layers}",
+            f"  act_type   : {self.act_type}",
             "",
             "  Parameters:",
             f"    embeddings  : {counts['embeddings']:>12,}",

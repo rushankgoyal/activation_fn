@@ -42,6 +42,11 @@ class ModelConfig:
     ffn_layers: int = 2              # 0 | 1 | 2 | 3 linear layers in FFN
     d_ff: Optional[int] = None       # FFN inner dim (default: 4 * d_model)
     dropout: float = 0.1
+    act_type: str = "gelu"           # activation function in FFN layers
+
+    _VALID_ACT_TYPES = frozenset(
+        ["gelu", "gelusine", "gelusincperturbation", "gmtu", "turbulent"]
+    )
 
     def __post_init__(self) -> None:
         if self.d_model % self.n_heads != 0:
@@ -50,6 +55,12 @@ class ModelConfig:
             )
         if self.ffn_layers not in (0, 1, 2, 3):
             raise ValueError(f"ffn_layers must be 0, 1, 2, or 3; got {self.ffn_layers}")
+        key = self.act_type.lower().replace("-", "").replace("_", "")
+        if key not in self._VALID_ACT_TYPES:
+            raise ValueError(
+                f"act_type '{self.act_type}' is not recognised. "
+                f"Valid options: {sorted(self._VALID_ACT_TYPES)}"
+            )
 
 
 @dataclass

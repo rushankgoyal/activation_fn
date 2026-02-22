@@ -26,6 +26,8 @@ output projection is excluded, or 8:4 when included.
 import torch
 import torch.nn as nn
 
+from .activations import build_activation
+
 
 class FFN0(nn.Module):
     """Architecture D: Zero linear layers — no FFN sub-layer.
@@ -53,7 +55,7 @@ class FFN1(nn.Module):
     """Architecture C: One linear layer.
 
     A single learnable projection from d_model -> d_model followed by a
-    GELU non-linearity.  This is the minimal FFN that can learn a
+    configurable non-linearity.  This is the minimal FFN that can learn a
     non-trivial per-position transformation while preserving the residual
     dimension.
 
@@ -62,12 +64,13 @@ class FFN1(nn.Module):
     Args:
         d_model: Model dimension.
         dropout: Dropout probability applied after the activation.
+        act_type: Activation function name (default 'gelu').
     """
 
-    def __init__(self, d_model: int, dropout: float = 0.1) -> None:
+    def __init__(self, d_model: int, dropout: float = 0.1, act_type: str = "gelu") -> None:
         super().__init__()
         self.linear = nn.Linear(d_model, d_model, bias=True)
-        self.act = nn.GELU()
+        self.act = build_activation(act_type)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -80,9 +83,9 @@ class FFN1(nn.Module):
 class FFN2(nn.Module):
     """Architecture A: Two linear layers — standard GPT-style FFN.
 
-    Projects input from d_model to d_ff (default: 4 * d_model), applies
-    GELU, then projects back.  This matches the MLP sub-layer used in
-    the original GPT-2/GPT-3 models.
+    Projects input from d_model to d_ff (default: 4 * d_model), applies a
+    configurable activation, then projects back.  This matches the MLP
+    sub-layer used in the original GPT-2/GPT-3 models.
 
     Parameter count: 2 * d_model * d_ff  (≈ 8 * d_model^2 for d_ff=4*d_model)
 
@@ -90,15 +93,17 @@ class FFN2(nn.Module):
         d_model: Model dimension.
         d_ff: Inner dimension of the FFN (default: 4 * d_model).
         dropout: Dropout probability applied between the two layers.
+        act_type: Activation function name (default 'gelu').
     """
 
     def __init__(
-        self, d_model: int, d_ff: int | None = None, dropout: float = 0.1
+        self, d_model: int, d_ff: int | None = None, dropout: float = 0.1,
+        act_type: str = "gelu",
     ) -> None:
         super().__init__()
         d_ff = d_ff if d_ff is not None else 4 * d_model
         self.fc1 = nn.Linear(d_model, d_ff)
-        self.act = nn.GELU()
+        self.act = build_activation(act_type)
         self.dropout = nn.Dropout(dropout)
         self.fc2 = nn.Linear(d_ff, d_model)
 
@@ -117,8 +122,8 @@ class FFN3(nn.Module):
     """Architecture B: Three linear layers.
 
     Extends the standard two-layer FFN with an additional hidden layer,
-    giving the architecture d_model -> d_ff -> d_ff -> d_model.  GELU is
-    applied after each of the first two projections.
+    giving the architecture d_model -> d_ff -> d_ff -> d_model.  A
+    configurable activation is applied after each of the first two projections.
 
     The paper shows this configuration outperforms the two-layer baseline
     even when using fewer transformer blocks (fewer total parameters).
@@ -130,18 +135,20 @@ class FFN3(nn.Module):
         d_model: Model dimension.
         d_ff: Inner dimension (default: 4 * d_model).
         dropout: Dropout probability applied after each activation.
+        act_type: Activation function name (default 'gelu').
     """
 
     def __init__(
-        self, d_model: int, d_ff: int | None = None, dropout: float = 0.1
+        self, d_model: int, d_ff: int | None = None, dropout: float = 0.1,
+        act_type: str = "gelu",
     ) -> None:
         super().__init__()
         d_ff = d_ff if d_ff is not None else 4 * d_model
         self.fc1 = nn.Linear(d_model, d_ff)
-        self.act1 = nn.GELU()
+        self.act1 = build_activation(act_type)
         self.dropout1 = nn.Dropout(dropout)
         self.fc2 = nn.Linear(d_ff, d_ff)
-        self.act2 = nn.GELU()
+        self.act2 = build_activation(act_type)
         self.dropout2 = nn.Dropout(dropout)
         self.fc3 = nn.Linear(d_ff, d_model)
 
@@ -159,7 +166,13 @@ class FFN3(nn.Module):
         return sum(p.numel() for p in self.parameters())
 
 
-def build_ffn(ffn_layers: int, d_model: int, d_ff: int | None = None, dropout: float = 0.1) -> nn.Module:
+def build_ffn(
+    ffn_layers: int,
+    d_model: int,
+    d_ff: int | None = None,
+    dropout: float = 0.1,
+    act_type: str = "gelu",
+) -> nn.Module:
     """Factory function to build an FFN module by the number of linear layers.
 
     Args:
@@ -167,6 +180,8 @@ def build_ffn(ffn_layers: int, d_model: int, d_ff: int | None = None, dropout: f
         d_model: Model dimension.
         d_ff: Inner FFN dimension (only used for ffn_layers >= 2).
         dropout: Dropout probability.
+        act_type: Activation function name (default 'gelu').  See
+            models.activations.build_activation for valid values.
 
     Returns:
         An FFN module instance.
@@ -174,10 +189,10 @@ def build_ffn(ffn_layers: int, d_model: int, d_ff: int | None = None, dropout: f
     if ffn_layers == 0:
         return FFN0(d_model, dropout)
     elif ffn_layers == 1:
-        return FFN1(d_model, dropout)
+        return FFN1(d_model, dropout, act_type)
     elif ffn_layers == 2:
-        return FFN2(d_model, d_ff, dropout)
+        return FFN2(d_model, d_ff, dropout, act_type)
     elif ffn_layers == 3:
-        return FFN3(d_model, d_ff, dropout)
+        return FFN3(d_model, d_ff, dropout, act_type)
     else:
         raise ValueError(f"ffn_layers must be 0, 1, 2, or 3; got {ffn_layers}")
